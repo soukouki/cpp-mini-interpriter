@@ -8,14 +8,14 @@ void run(std::string input);
 
 int main() {
   run(R"(
-    #(print (concat "Hello, " "World!"))
-    #(print (getAt "Hello, World!" 4))
+    (print (concat "Hello, " "World!"))
+    (print (getAt "Hello, World!" 4))
     ((fun () (set x 1) (print x)))
-    #(set add1 (fun (x) (add x 1)))
-    #(if (eq (add1 1) 1) (print "true") (print "false"))
-    #(set fact (fun (x) (if (eq x 0) 1 (mul x (fact (sub x 1))))))
-    #(set i (toInt (read)))
-    #(print (concat "fact = " (toStr (fact i))))
+    (set add1 (fun (x) (add x 1)))
+    (if (eq (add1 1) 1) (print "true") (print "false"))
+    (set fact (fun (x) (if (eq x 0) 1 (mul x (fact (sub x 1))))))
+    (set i (toInt (read)))
+    (print (concat "fact = " (toStr (fact i))))
   )");
 }
 
@@ -110,6 +110,28 @@ std::vector<Token*> tokenize(std::string input) {
     }
   }
   return tokens;
+}
+
+void printTokens(std::vector<Token*> tokens, int index) {
+  for(int i = 0; i < tokens.size(); i++) {
+    if(i == index) {
+      std::cout << " >>";
+    } else {
+      std::cout << "   ";
+    }
+    if(tokens.at(i)->type == TokenType::T_LPAREN) {
+      std::cout << "(";
+    } else if(tokens.at(i)->type == TokenType::T_RPAREN) {
+      std::cout << ")";
+    } else if(tokens.at(i)->type == TokenType::T_STRING) {
+      std::cout << "<str: " << ((StringToken*)tokens.at(i))->value << ">";
+    } else if(tokens.at(i)->type == TokenType::T_NUMBER) {
+      std::cout << "<num: " << ((NumberToken*)tokens.at(i))->value << ">";
+    } else if(tokens.at(i)->type == TokenType::T_SYMBOL) {
+      std::cout << ((SymbolToken*)tokens.at(i))->value;
+    }
+  }
+  std::cout << std::endl;
 }
 
 
@@ -225,87 +247,102 @@ AST* parseExpression(std::vector<Token*> tokens, int& index);
 AST* parseStatements(std::vector<Token*> tokens, int& index);
 
 // "set name value"
-// "if cond if_body else_body"
-// "fun (arg1 arg2 ...) body"
-// "funcname arg1 arg2 ..."
-// "(funcvalue) arg1 arg2 ..."
-AST* parseCall(std::vector<Token*> tokens, int& index) {
-  SymbolToken* token = (SymbolToken*)tokens.at(index);
-  if(token->value == "set") {
+AST* parseSet(std::vector<Token*> tokens, int& index) {
+  if(tokens.at(index)->type == TokenType::T_SYMBOL && ((SymbolToken*)tokens.at(index))->value == "set") {
     index++;
-    token = (SymbolToken*)tokens.at(index);
-    if(token->type == TokenType::T_SYMBOL) {
-      std::string name = token->value;
+    if(tokens.at(index)->type == TokenType::T_SYMBOL) {
+      std::string name = ((SymbolToken*)tokens.at(index))->value;
       index++;
       AST* value = parseExpression(tokens, index);
-      token = (SymbolToken*)tokens.at(index);
-      if(token->type == TokenType::T_RPAREN) {
-        index++;
+      if(value != nullptr) {
         return new SetValueAST(name, value);
       }
     }
-  } else if(token->value == "if") {
+  }
+  return nullptr;
+}
+
+// "if cond if_body else_body"
+AST* parseIf(std::vector<Token*> tokens, int& index) {
+  if(tokens.at(index)->type == TokenType::T_SYMBOL && ((SymbolToken*)tokens.at(index))->value == "if") {
     index++;
     AST* cond = parseExpression(tokens, index);
-    AST* if_body = parseExpression(tokens, index);
-    AST* else_body = parseExpression(tokens, index);
-    token = (SymbolToken*)tokens.at(index);
-    if(token->type == TokenType::T_RPAREN) {
-      index++;
-      return new IfAST(cond, if_body, else_body);
+    if(cond != nullptr) {
+      AST* if_body = parseExpression(tokens, index);
+      if(if_body != nullptr) {
+        AST* else_body = parseExpression(tokens, index);
+        if(else_body != nullptr) {
+          return new IfAST(cond, if_body, else_body);
+        }
+      }
     }
-  } else if(token->value == "fun") {
-    std::cerr << "fun" << std::endl;
+  }
+  return nullptr;
+}
+
+// "fun (arg1 arg2 ...) body"
+AST* parseLambda(std::vector<Token*> tokens, int& index) {
+  if(tokens.at(index)->type == TokenType::T_SYMBOL && ((SymbolToken*)tokens.at(index))->value == "fun") {
     index++;
-    token = (SymbolToken*)tokens.at(index);
-    if(token->type == TokenType::T_LPAREN) {
+    if(tokens.at(index)->type == TokenType::T_LPAREN) {
       index++;
       std::vector<std::string> args;
-      token = (SymbolToken*)tokens.at(index);
-      while(token->type == TokenType::T_SYMBOL) {
-        args.push_back(token->value);
+      while(tokens.at(index)->type == TokenType::T_SYMBOL) {
+        args.push_back(((SymbolToken*)tokens.at(index))->value);
         index++;
-        token = (SymbolToken*)tokens.at(index);
       }
-      if(token->type == TokenType::T_RPAREN) {
+      if(tokens.at(index)->type == TokenType::T_RPAREN) {
         index++;
         AST* body = parseStatements(tokens, index);
-        token = (SymbolToken*)tokens.at(index);
-        std::cerr << "fun2" << tokenTypeToString(token->type) << index << std::endl;
-        if(token->type == TokenType::T_RPAREN) {
-          index++;
+        if(body != nullptr) {
           return new LambdaAST(args, body);
         }
       }
     }
-  } else if(token->type == TokenType::T_LPAREN) {
-    // (funcvalue) arg1 arg2 ...
-    index++;
-    std::cerr << 1 << tokenTypeToString(tokens.at(index)->type) << index << std::endl;
-    AST* func = parseCall(tokens, index);
-    if(func == nullptr) {
-      std::cerr << "nullptr" << std::endl;
-      return nullptr;
-    }
+  }
+  return nullptr;
+}
+
+// "expr arg1 arg2 ..."
+AST* parseFuncCall(std::vector<Token*> tokens, int& index) {
+  AST* func = parseExpression(tokens, index);
+  if(func != nullptr) {
     std::vector<AST*> args;
-    token = (SymbolToken*)tokens.at(index);
-    while(token->type != TokenType::T_RPAREN) {
+    while(true) {
       AST* arg = parseExpression(tokens, index);
+      if(arg == nullptr) {
+        break;
+      }
       args.push_back(arg);
-      token = (SymbolToken*)tokens.at(index);
     }
-    index++;
     return new FuncCallAST(func, args);
   }
   return nullptr;
 }
 
-// "(symbol value1 value2 ...)"
+// (expr ...) or value
 AST* parseExpression(std::vector<Token*> tokens, int& index) {
-  Token* token = tokens.at(index);
-  if(token->type == TokenType::T_LPAREN) {
+  if(tokens.at(index)->type == TokenType::T_LPAREN) {
     index++;
-    return parseCall(tokens, index);
+    AST* ast = parseSet(tokens, index);
+    if(ast == nullptr) {
+      ast = parseIf(tokens, index);
+    }
+    if(ast == nullptr) {
+      ast = parseLambda(tokens, index);
+    }
+    if(ast == nullptr) {
+      ast = parseFuncCall(tokens, index);
+    }
+    if(ast == nullptr) {
+      std::cerr << "unknown expression" << std::endl;
+      return nullptr;
+    }
+    if(tokens.at(index)->type == TokenType::T_RPAREN) {
+      index++;
+      return ast;
+    }
+    return nullptr;
   } else {
     return parseValue(tokens, index);
   }
@@ -313,7 +350,7 @@ AST* parseExpression(std::vector<Token*> tokens, int& index) {
 
 AST* parseStatements(std::vector<Token*> tokens, int& index) {
   std::vector<AST*> statements;
-  while(true) {
+  while(index < tokens.size()) {
     AST* statement = parseExpression(tokens, index);
     if(statement == nullptr) {
       break;
@@ -512,9 +549,7 @@ Value* execute(AST* ast, Environment* env) {
     auto statements_ast = (StatementsAST*)ast;
     Value* value = new NullValue();
     for(int i = 0; i < statements_ast->statements.size(); i++) {
-      std::cerr << "statements " << astTypeToString(statements_ast->statements.at(i)->type) << " statements:" << statements_ast->statements.size() << std::endl;
       value = execute(statements_ast->statements.at(i), env);
-      std::cerr << "statements end" << std::endl;
     }
     return value;
   }

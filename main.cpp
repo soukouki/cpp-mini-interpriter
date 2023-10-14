@@ -592,7 +592,12 @@ Value* eqFunction(std::vector<Value*> args) {
   if(value1->type == ValueType::V_NUMBER && value2->type == ValueType::V_NUMBER) {
     return new NumberValue(((NumberValue*)value1)->value == ((NumberValue*)value2)->value);
   }
-  // TODO string, null, bool
+  if(value1->type == ValueType::V_STRING && value2->type == ValueType::V_STRING) {
+    return new NumberValue(((StringValue*)value1)->value == ((StringValue*)value2)->value);
+  }
+  if(value1->type == ValueType::V_NULL && value2->type == ValueType::V_NULL) {
+    return new NumberValue(1);
+  }
   std::cerr << "type error at eq: 1st arg is " << valueTypeToString(value1->type) << ", 2nd arg is " << valueTypeToString(value2->type) << std::endl;
   return new NullValue();
 }

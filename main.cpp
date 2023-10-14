@@ -739,7 +739,7 @@ Value* toStringFunction(std::vector<Value*> args) {
 
 Value* readFunction(std::vector<Value*> args) {
   std::string value;
-  std::cin >> value;
+  std::getline(std::cin, value);
   return new StringValue(value);
 }
 

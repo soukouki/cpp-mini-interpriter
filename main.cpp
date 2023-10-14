@@ -9,6 +9,7 @@ void run(std::string input);
 int main() {
   run(R"(
     (print (concat "Hello, " "World!"))
+    (print (getAt "Hello, World!" 4))
     (set x 1)
     (print (add x 2))
     (set add1 (fun (x) (add x 1)))
@@ -521,6 +522,20 @@ Value* concatFunction(std::vector<Value*> args) {
   return new NullValue();
 }
 
+Value* getAtFunction(std::vector<Value*> args) {
+  auto value1 = args.at(0);
+  auto value2 = args.at(1);
+  if(value1->type == ValueType::V_STRING && value2->type == ValueType::V_NUMBER) {
+    auto value = ((StringValue*)value1)->value;
+    auto index = ((NumberValue*)value2)->value;
+    if(index >= 0 && index < value.size()) {
+      return new StringValue(value.substr(index, 1));
+    }
+  }
+  std::cerr << "type error at getAt: 1st arg is " << valueTypeToString(value1->type) << ", 2nd arg is " << valueTypeToString(value2->type) << std::endl;
+  return new NullValue();
+}
+
 Value* addFunction(std::vector<Value*> args) {
   auto value1 = args.at(0);
   auto value2 = args.at(1);
@@ -659,6 +674,7 @@ Environment* defaultEnvironment() {
   Environment* env = new Environment();
   env->set("print", new BuildInFunctionValue(printFunction, 1));
   env->set("concat", new BuildInFunctionValue(concatFunction, 2));
+  env->set("getAt", new BuildInFunctionValue(getAtFunction, 2));
   env->set("add", new BuildInFunctionValue(addFunction, 2));
   env->set("sub", new BuildInFunctionValue(subFunction, 2));
   env->set("mul", new BuildInFunctionValue(mulFunction, 2));

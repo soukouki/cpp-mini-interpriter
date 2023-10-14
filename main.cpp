@@ -763,6 +763,7 @@ Environment* defaultEnvironment() {
   env->set("toInt", new BuildInFunctionValue(toIntFunction, 1));
   env->set("toStr", new BuildInFunctionValue(toStringFunction, 1));
   env->set("read", new BuildInFunctionValue(readFunction, 0));
+  env->set("null", new NullValue());
   return env;
 }
 

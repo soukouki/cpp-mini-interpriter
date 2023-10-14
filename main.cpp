@@ -537,6 +537,8 @@ Value* getAtFunction(std::vector<Value*> args) {
     auto index = ((NumberValue*)value2)->value;
     if(index >= 0 && index < value.size()) {
       return new StringValue(value.substr(index, 1));
+    } else {
+      std::cerr << "index out of range: " << index << std::endl;
     }
   }
   std::cerr << "type error at getAt: 1st arg is " << valueTypeToString(value1->type) << ", 2nd arg is " << valueTypeToString(value2->type) << std::endl;

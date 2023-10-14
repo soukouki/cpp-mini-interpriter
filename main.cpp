@@ -545,6 +545,15 @@ Value* getAtFunction(std::vector<Value*> args) {
   return new NullValue();
 }
 
+Value* lengthFunction(std::vector<Value*> args) {
+  auto value = args.at(0);
+  if(value->type == ValueType::V_STRING) {
+    return new NumberValue(((StringValue*)value)->value.size());
+  }
+  std::cerr << "type error at length: arg is " << valueTypeToString(value->type) << std::endl;
+  return new NullValue();
+}
+
 Value* addFunction(std::vector<Value*> args) {
   auto value1 = args.at(0);
   auto value2 = args.at(1);
@@ -689,6 +698,7 @@ Environment* defaultEnvironment() {
   env->set("print", new BuildInFunctionValue(printFunction, 1));
   env->set("concat", new BuildInFunctionValue(concatFunction, 2));
   env->set("getAt", new BuildInFunctionValue(getAtFunction, 2));
+  env->set("length", new BuildInFunctionValue(lengthFunction, 1));
   env->set("add", new BuildInFunctionValue(addFunction, 2));
   env->set("sub", new BuildInFunctionValue(subFunction, 2));
   env->set("mul", new BuildInFunctionValue(mulFunction, 2));

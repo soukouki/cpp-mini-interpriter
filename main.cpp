@@ -690,35 +690,6 @@ Value* gtFunction(std::vector<Value*> args) {
   return new NullValue();
 }
 
-Value* notFunction(std::vector<Value*> args) {
-  auto value = args.at(0);
-  if(value->type == ValueType::V_NUMBER) {
-    return new NumberValue(!((NumberValue*)value)->value);
-  }
-  std::cerr << "type error at not: arg is " << valueTypeToString(value->type) << std::endl;
-  return new NullValue();
-}
-
-Value* andFunction(std::vector<Value*> args) {
-  auto value1 = args.at(0);
-  auto value2 = args.at(1);
-  if(value1->type == ValueType::V_NUMBER && value2->type == ValueType::V_NUMBER) {
-    return new NumberValue(((NumberValue*)value1)->value && ((NumberValue*)value2)->value);
-  }
-  std::cerr << "type error at and: 1st arg is " << valueTypeToString(value1->type) << ", 2nd arg is " << valueTypeToString(value2->type) << std::endl;
-  return new NullValue();
-}
-
-Value* orFunction(std::vector<Value*> args) {
-  auto value1 = args.at(0);
-  auto value2 = args.at(1);
-  if(value1->type == ValueType::V_NUMBER && value2->type == ValueType::V_NUMBER) {
-    return new NumberValue(((NumberValue*)value1)->value || ((NumberValue*)value2)->value);
-  }
-  std::cerr << "type error at or: 1st arg is " << valueTypeToString(value1->type) << ", 2nd arg is " << valueTypeToString(value2->type) << std::endl;
-  return new NullValue();
-}
-
 Value* toIntFunction(std::vector<Value*> args) {
   auto value = args.at(0);
   if(value->type == ValueType::V_STRING) {
@@ -735,6 +706,11 @@ Value* toStringFunction(std::vector<Value*> args) {
   }
   std::cerr << "type error at toString: arg is " << valueTypeToString(value->type) << std::endl;
   return new NullValue();
+}
+
+Value* typeFunction(std::vector<Value*> args) {
+  auto value = args.at(0);
+  return new StringValue(valueTypeToString(value->type));
 }
 
 Value* readFunction(std::vector<Value*> args) {
@@ -757,11 +733,9 @@ Environment* defaultEnvironment() {
   env->set("eq", new BuildInFunctionValue(eqFunction, 2));
   env->set("lt", new BuildInFunctionValue(ltFunction, 2));
   env->set("gt", new BuildInFunctionValue(gtFunction, 2));
-  env->set("not", new BuildInFunctionValue(notFunction, 1));
-  env->set("and", new BuildInFunctionValue(andFunction, 2));
-  env->set("or", new BuildInFunctionValue(orFunction, 2));
   env->set("toInt", new BuildInFunctionValue(toIntFunction, 1));
   env->set("toStr", new BuildInFunctionValue(toStringFunction, 1));
+  env->set("type", new BuildInFunctionValue(typeFunction, 1));
   env->set("read", new BuildInFunctionValue(readFunction, 0));
   env->set("null", new NullValue());
   return env;

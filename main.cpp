@@ -666,8 +666,7 @@ Value* eqFunction(std::vector<Value*> args) {
   if(value1->type == ValueType::V_NULL && value2->type == ValueType::V_NULL) {
     return new NumberValue(1);
   }
-  std::cerr << "type error at eq: 1st arg is " << valueTypeToString(value1->type) << ", 2nd arg is " << valueTypeToString(value2->type) << std::endl;
-  return new NullValue();
+  return new NumberValue(0);
 }
 
 Value* ltFunction(std::vector<Value*> args) {

@@ -1,4 +1,5 @@
 #include<iostream>
+#include<sstream>
 #include<string>
 #include<vector>
 #include<map>
@@ -18,6 +19,22 @@ int main() {
     (print (concat "fact = " (toStr (fact i))))
   )");
 }
+
+class Where {
+  public:
+  int line;
+  int column;
+  Where(int line, int column) : line(line), column(column) {}
+  std::string toString() {
+    std::stringstream ss;
+    ss << line << ":" << column;
+    return ss.str();
+  }
+  friend std::ostream& operator<<(std::ostream& os, Where& where) {
+    os << where.toString();
+    return os;
+  }
+};
 
 enum class TokenType {
     T_LPAREN,
@@ -46,52 +63,64 @@ std::string tokenTypeToString(TokenType type) {
 class Token {
   public:
   TokenType type;
-  Token(TokenType type) : type(type) {}
+  Where where;
+  Token(TokenType type, Where where) : type(type), where(where) {}
 };
 
 class StringToken : public Token {
   public:
   std::string value;
-  StringToken(std::string value) : Token(TokenType::T_STRING), value(value) {}
+  StringToken(std::string value, Where where) : Token(TokenType::T_STRING, where), value(value) {}
 };
 
 class NumberToken : public Token {
   public:
   int value;
-  NumberToken(int value) : Token(TokenType::T_NUMBER), value(value) {}
+  NumberToken(int value, Where where) : Token(TokenType::T_NUMBER, where), value(value) {}
 };
 
 class SymbolToken : public Token {
   public:
   std::string value;
-  SymbolToken(std::string value) : Token(TokenType::T_SYMBOL), value(value) {}
+  SymbolToken(std::string value, Where where) : Token(TokenType::T_SYMBOL, where), value(value) {}
 };
 
 std::vector<Token*> tokenize(std::string input) {
   std::vector<Token*> tokens;
+  int line = 1;
+  int line_start = 0;
   for(int i = 0; i < input.size(); i++) {
     char c = input.at(i);
     if(c == '(') {
-      tokens.push_back(new Token(TokenType::T_LPAREN));
+      tokens.push_back(new Token(TokenType::T_LPAREN, Where(line, i - line_start)));
     } else if(c == ')') {
-      tokens.push_back(new Token(TokenType::T_RPAREN));
+      tokens.push_back(new Token(TokenType::T_RPAREN, Where(line, i - line_start)));
     } else if(c == '"') {
       for(int j = i + 1; j < input.size(); j++) {
-        if(input.at(j) == '"') {
-          tokens.push_back(new StringToken(input.substr(i + 1, j - i - 1)));
+        if(input.at(j) == '\n') {
+          line++;
+          line_start = j + 1;
+        } else if(input.at(j) == '"') {
+          tokens.push_back(new StringToken(input.substr(i + 1, j - i - 1), Where(line, i - line_start)));
           i = j;
           break;
         }
       }
     } else if(c == '#') {
-      for(; i < input.size() && input.at(i) != '\n'; i++);
+      for(; i < input.size(); i++) {
+        if(input.at(i) == '\n') {
+          line++;
+          line_start = i + 1;
+          break;
+        }
+      }
     } else if(c >= '0' && c <= '9') {
       int value = 0;
       for (int j = i; j < input.size(); j++) {
         if(input.at(j) >= '0' && input.at(j) <= '9') {
           value = value * 10 + (input.at(j) - '0');
         } else {
-          tokens.push_back(new NumberToken(value));
+          tokens.push_back(new NumberToken(value, Where(line, i - line_start)));
           i = j - 1;
           break;
         }
@@ -102,11 +131,19 @@ std::vector<Token*> tokenize(std::string input) {
         if(input.at(j) >= 'a' && input.at(j) <= 'z' || input.at(j) >= 'A' && input.at(j) <= 'Z' || input.at(j) == '_' || input.at(j) >= '0' && input.at(j) <= '9') {
           value += input.at(j);
         } else {
-          tokens.push_back(new SymbolToken(value));
+          tokens.push_back(new SymbolToken(value, Where(line, i - line_start)));
           i = j - 1;
           break;
         }
       }
+    } else if(c == ' ' || c == '\t' || c == '\r' || c == '\n') {
+      if(c == '\n') {
+        line++;
+        line_start = i + 1;
+      }
+    } else {
+      auto where = Where(line, i - line_start);
+      std::cerr << "unknown char: " << c << " at " << where << std::endl;
     }
   }
   return tokens;
@@ -171,47 +208,48 @@ std::string astTypeToString(ASTType type) {
 class AST {
   public:
   ASTType type;
+  Where where;
   protected:
-  AST(ASTType type) : type(type) {}
+  AST(ASTType type, Where where) : type(type), where(where) {}
 };
 
 class StringAST : public AST {
   public:
   std::string value;
-  StringAST(std::string value) : AST(ASTType::A_STRING), value(value) {}
+  StringAST(std::string value, Where where) : AST(ASTType::A_STRING, where), value(value) {}
 };
 
 class NumberAST : public AST {
   public:
   int value;
-  NumberAST(int value) : AST(ASTType::A_NUMBER), value(value) {}
+  NumberAST(int value, Where where) : AST(ASTType::A_NUMBER, where), value(value) {}
 };
 
 class GetValueAST : public AST {
   public:
   std::string name;
-  GetValueAST(std::string name) : AST(ASTType::A_GET_VALUE), name(name) {}
+  GetValueAST(std::string name, Where where) : AST(ASTType::A_GET_VALUE, where), name(name) {}
 };
 
 class SetValueAST : public AST {
   public:
   std::string name;
   AST* value;
-  SetValueAST(std::string name, AST* value) : AST(ASTType::A_SET_VALUE), name(name), value(value) {}
+  SetValueAST(std::string name, AST* value, Where where) : AST(ASTType::A_SET_VALUE, where), name(name), value(value) {}
 };
 
 class FuncCallAST : public AST {
   public:
   AST* func;
   std::vector<AST*> args;
-  FuncCallAST(AST* func, std::vector<AST*> args) : AST(ASTType::A_FUNC_CALL), func(func), args(args) {}
+  FuncCallAST(AST* func, std::vector<AST*> args, Where where) : AST(ASTType::A_FUNC_CALL, where), func(func), args(args) {}
 };
 
 class LambdaAST : public AST {
   public:
   std::vector<std::string> args;
   AST* body;
-  LambdaAST(std::vector<std::string> args, AST* body) : AST(ASTType::A_LAMBDA), args(args), body(body) {}
+  LambdaAST(std::vector<std::string> args, AST* body, Where where) : AST(ASTType::A_LAMBDA, where), args(args), body(body) {}
 };
 
 class IfAST : public AST {
@@ -219,26 +257,26 @@ class IfAST : public AST {
   AST* cond;
   AST* if_body;
   AST* else_body;
-  IfAST(AST* cond, AST* if_body, AST* else_body) : AST(ASTType::A_IF), cond(cond), if_body(if_body), else_body(else_body) {}
+  IfAST(AST* cond, AST* if_body, AST* else_body, Where where) : AST(ASTType::A_IF, where), cond(cond), if_body(if_body), else_body(else_body) {}
 };
 
 class StatementsAST : public AST {
   public:
   std::vector<AST*> statements;
-  StatementsAST(std::vector<AST*> statements) : AST(ASTType::A_STATEMENTS), statements(statements) {}
+  StatementsAST(std::vector<AST*> statements, Where where) : AST(ASTType::A_STATEMENTS, where), statements(statements) {}
 };
 
 AST* parseValue(std::vector<Token*> tokens, int& index) {
   Token* token = tokens.at(index);
   if(token->type == TokenType::T_STRING) {
     index++;
-    return new StringAST(((StringToken*)token)->value);
+    return new StringAST(((StringToken*)token)->value, token->where);
   } else if(token->type == TokenType::T_NUMBER) {
     index++;
-    return new NumberAST(((NumberToken*)token)->value);
+    return new NumberAST(((NumberToken*)token)->value, token->where);
   } else if(token->type == TokenType::T_SYMBOL) {
     index++;
-    return new GetValueAST(((SymbolToken*)token)->value);
+    return new GetValueAST(((SymbolToken*)token)->value, token->where);
   }
   return nullptr;
 }
@@ -248,6 +286,7 @@ AST* parseStatements(std::vector<Token*> tokens, int& index);
 
 // "set name value"
 AST* parseSet(std::vector<Token*> tokens, int& index) {
+  auto set_token_where = tokens.at(index)->where;
   if(tokens.at(index)->type == TokenType::T_SYMBOL && ((SymbolToken*)tokens.at(index))->value == "set") {
     index++;
     if(tokens.at(index)->type == TokenType::T_SYMBOL) {
@@ -255,7 +294,7 @@ AST* parseSet(std::vector<Token*> tokens, int& index) {
       index++;
       AST* value = parseExpression(tokens, index);
       if(value != nullptr) {
-        return new SetValueAST(name, value);
+        return new SetValueAST(name, value, set_token_where);
       }
     }
   }
@@ -264,6 +303,7 @@ AST* parseSet(std::vector<Token*> tokens, int& index) {
 
 // "if cond if_body else_body"
 AST* parseIf(std::vector<Token*> tokens, int& index) {
+  auto if_token_where = tokens.at(index)->where;
   if(tokens.at(index)->type == TokenType::T_SYMBOL && ((SymbolToken*)tokens.at(index))->value == "if") {
     index++;
     AST* cond = parseExpression(tokens, index);
@@ -272,7 +312,7 @@ AST* parseIf(std::vector<Token*> tokens, int& index) {
       if(if_body != nullptr) {
         AST* else_body = parseExpression(tokens, index);
         if(else_body != nullptr) {
-          return new IfAST(cond, if_body, else_body);
+          return new IfAST(cond, if_body, else_body, if_token_where);
         }
       }
     }
@@ -282,6 +322,7 @@ AST* parseIf(std::vector<Token*> tokens, int& index) {
 
 // "fun (arg1 arg2 ...) body"
 AST* parseLambda(std::vector<Token*> tokens, int& index) {
+  auto fun_token_where = tokens.at(index)->where;
   if(tokens.at(index)->type == TokenType::T_SYMBOL && ((SymbolToken*)tokens.at(index))->value == "fun") {
     index++;
     if(tokens.at(index)->type == TokenType::T_LPAREN) {
@@ -295,7 +336,7 @@ AST* parseLambda(std::vector<Token*> tokens, int& index) {
         index++;
         AST* body = parseStatements(tokens, index);
         if(body != nullptr) {
-          return new LambdaAST(args, body);
+          return new LambdaAST(args, body, fun_token_where);
         }
       }
     }
@@ -305,6 +346,7 @@ AST* parseLambda(std::vector<Token*> tokens, int& index) {
 
 // "expr arg1 arg2 ..."
 AST* parseFuncCall(std::vector<Token*> tokens, int& index) {
+  auto func_call_token_where = tokens.at(index)->where;
   AST* func = parseExpression(tokens, index);
   if(func != nullptr) {
     std::vector<AST*> args;
@@ -315,7 +357,7 @@ AST* parseFuncCall(std::vector<Token*> tokens, int& index) {
       }
       args.push_back(arg);
     }
-    return new FuncCallAST(func, args);
+    return new FuncCallAST(func, args, func_call_token_where);
   }
   return nullptr;
 }
@@ -335,7 +377,7 @@ AST* parseExpression(std::vector<Token*> tokens, int& index) {
       ast = parseFuncCall(tokens, index);
     }
     if(ast == nullptr) {
-      std::cerr << "unknown expression" << std::endl;
+      std::cerr << "unknown expression at" << tokens.at(index)->where << std::endl;
       return nullptr;
     }
     if(tokens.at(index)->type == TokenType::T_RPAREN) {
@@ -349,6 +391,7 @@ AST* parseExpression(std::vector<Token*> tokens, int& index) {
 }
 
 AST* parseStatements(std::vector<Token*> tokens, int& index) {
+  auto statements_token_where = tokens.at(index)->where;
   std::vector<AST*> statements;
   while(index < tokens.size()) {
     AST* statement = parseExpression(tokens, index);
@@ -357,12 +400,17 @@ AST* parseStatements(std::vector<Token*> tokens, int& index) {
     }
     statements.push_back(statement);
   }
-  return new StatementsAST(statements);
+  return new StatementsAST(statements, statements_token_where);
 }
 
 AST* parse(std::vector<Token*> tokens) {
   int index = 0;
-  return parseStatements(tokens, index);
+  auto ast = parseStatements(tokens, index);
+  if(index < tokens.size()) {
+    std::cerr << "parse error at " << tokens.at(index)->where << std::endl;
+    return nullptr;
+  }
+  return ast;
 }
 
 
@@ -425,10 +473,6 @@ class Environment {
     return true;
   }
   Value* get(std::string name) {
-    if(!find(name)) {
-      std::cerr << "undefined value: " << name << std::endl;
-      return new NullValue();
-    }
     if(values.find(name) == values.end()) {
       return parent->get(name);
     }
@@ -461,19 +505,19 @@ class FunctionValue : public Value {
   public:
   int args_size;
   std::vector<Value*> applied_args;
-  Value* apply(std::vector<Value*> args) {
+  Value* apply(std::vector<Value*> args, Where where) {
     applied_args.insert(applied_args.end(), args.begin(), args.end());
     if(applied_args.size() == args_size) {
-      return this->call(applied_args);
+      return this->call(applied_args, where);
     } else if(applied_args.size() > args_size) {
-      std::cerr << "too many args" << std::endl;
+      std::cerr << "too many args at " << where << std::endl;
       return new NullValue();
     } else {
       return this;
     }
   }
   protected:
-  virtual Value* call(std::vector<Value*> args) = 0;
+  virtual Value* call(std::vector<Value*> args, Where where) = 0;
   FunctionValue(ValueType type, int args_size) : Value(type), args_size(args_size) {}
 };
 
@@ -485,7 +529,7 @@ class DefinedFunctionValue : public FunctionValue {
   AST* body;
   Environment* env;
   DefinedFunctionValue(int args_size, std::vector<std::string> arg_names, AST* body, Environment* env) : FunctionValue(ValueType::V_DEFINED_FUNCTION, args_size), arg_names(arg_names), body(body), env(env) {}
-  Value* call(std::vector<Value*> args) {
+  Value* call(std::vector<Value*> args, Where where) {
     auto new_env = env->createChild();
     for(int i = 0; i < args.size(); i++) {
       new_env->set(arg_names.at(i), args.at(i));
@@ -499,10 +543,10 @@ class DefinedFunctionValue : public FunctionValue {
 
 class BuildInFunctionValue : public FunctionValue {
   public:
-  std::function<Value*(std::vector<Value*>)> func;
-  BuildInFunctionValue(std::function<Value*(std::vector<Value*>)> func, int args_size) : FunctionValue(ValueType::V_BUILD_IN_FUNCTION, args_size), func(func) {}
-  Value* call(std::vector<Value*> args) {
-    return func(args);
+  std::function<Value*(std::vector<Value*>, Where)> func;
+  BuildInFunctionValue(std::function<Value*(std::vector<Value*>, Where)> func, int args_size) : FunctionValue(ValueType::V_BUILD_IN_FUNCTION, args_size), func(func) {}
+  Value* call(std::vector<Value*> args, Where where) {
+    return func(args, where);
   }
   BuildInFunctionValue* copy() {
     return new BuildInFunctionValue(func, args_size);
@@ -515,7 +559,12 @@ Value* execute(AST* ast, Environment* env) {
   } else if(ast->type == ASTType::A_NUMBER) {
     return new NumberValue(((NumberAST*)ast)->value);
   } else if(ast->type == ASTType::A_GET_VALUE) {
-    return env->get(((GetValueAST*)ast)->name)->copy();
+    auto get_value_ast = (GetValueAST*)ast;
+    if(env->find(get_value_ast->name)) {
+      return env->get(get_value_ast->name)->copy();
+    } else {
+      std::cerr << "undefined variable: " << get_value_ast->name << " at " << get_value_ast->where << std::endl;
+    }
   } else if(ast->type == ASTType::A_SET_VALUE) {
     auto set_value_ast = (SetValueAST*)ast;
     env->set(set_value_ast->name, execute(set_value_ast->value, env));
@@ -528,9 +577,9 @@ Value* execute(AST* ast, Environment* env) {
       for(int i = 0; i < func_call_ast->args.size(); i++) {
         args.push_back(execute(func_call_ast->args.at(i), env));
       }
-      return ((FunctionValue*)func)->apply(args);
+      return ((FunctionValue*)func)->apply(args, func_call_ast->where);
     } else {
-      std::cerr << "not a function: " << valueTypeToString(func->type) << std::endl;
+      std::cerr << "not a function: " << valueTypeToString(func->type) << " at " << func_call_ast->where << std::endl;
     }
   } else if(ast->type == ASTType::A_LAMBDA) {
     auto lambda_ast = (LambdaAST*)ast;
@@ -556,7 +605,7 @@ Value* execute(AST* ast, Environment* env) {
   return new NullValue();
 }
 
-Value* printFunction(std::vector<Value*> args) {
+Value* printFunction(std::vector<Value*> args, Where where) {
   auto value = args.at(0);
   if(value->type == ValueType::V_STRING) {
     std::cout << ((StringValue*)value)->value;
@@ -569,17 +618,17 @@ Value* printFunction(std::vector<Value*> args) {
   return new NullValue();
 }
 
-Value* concatFunction(std::vector<Value*> args) {
+Value* concatFunction(std::vector<Value*> args, Where where) {
   auto value1 = args.at(0);
   auto value2 = args.at(1);
   if(value1->type == ValueType::V_STRING && value2->type == ValueType::V_STRING) {
     return new StringValue(((StringValue*)value1)->value + ((StringValue*)value2)->value);
   }
-  std::cerr << "type error at concat: 1st arg is " << valueTypeToString(value1->type) << ", 2nd arg is " << valueTypeToString(value2->type) << std::endl;
+  std::cerr << "type error at concat: 1st arg is " << valueTypeToString(value1->type) << ", 2nd arg is " << valueTypeToString(value2->type) << " at " << where << std::endl;
   return new NullValue();
 }
 
-Value* getAtFunction(std::vector<Value*> args) {
+Value* getAtFunction(std::vector<Value*> args, Where where) {
   auto value1 = args.at(0);
   auto value2 = args.at(1);
   if(value1->type == ValueType::V_STRING && value2->type == ValueType::V_NUMBER) {
@@ -588,73 +637,77 @@ Value* getAtFunction(std::vector<Value*> args) {
     if(index >= 0 && index < value.size()) {
       return new StringValue(value.substr(index, 1));
     } else {
-      std::cerr << "index out of range: " << index << std::endl;
+      std::cerr << "index out of range: " << index << " at " << where << std::endl;
     }
   }
-  std::cerr << "type error at getAt: 1st arg is " << valueTypeToString(value1->type) << ", 2nd arg is " << valueTypeToString(value2->type) << std::endl;
+  std::cerr << "type error at getAt: 1st arg is " << valueTypeToString(value1->type) << ", 2nd arg is " << valueTypeToString(value2->type) << " at " << where << std::endl;
   return new NullValue();
 }
 
-Value* lengthFunction(std::vector<Value*> args) {
+Value* lengthFunction(std::vector<Value*> args, Where where) {
   auto value = args.at(0);
   if(value->type == ValueType::V_STRING) {
     return new NumberValue(((StringValue*)value)->value.size());
   }
-  std::cerr << "type error at length: arg is " << valueTypeToString(value->type) << std::endl;
+  std::cerr << "type error at length: arg is " << valueTypeToString(value->type) << " at " << where << std::endl;
   return new NullValue();
 }
 
-Value* addFunction(std::vector<Value*> args) {
+Value* addFunction(std::vector<Value*> args, Where where) {
   auto value1 = args.at(0);
   auto value2 = args.at(1);
   if(value1->type == ValueType::V_NUMBER && value2->type == ValueType::V_NUMBER) {
     return new NumberValue(((NumberValue*)value1)->value + ((NumberValue*)value2)->value);
   }
-  std::cerr << "type error at add: 1st arg is " << valueTypeToString(value1->type) << ", 2nd arg is " << valueTypeToString(value2->type) << std::endl;
+  std::cerr << "type error at add: 1st arg is " << valueTypeToString(value1->type) << ", 2nd arg is " << valueTypeToString(value2->type) << " at " << where << std::endl;
   return new NullValue();
 }
 
-Value* subFunction(std::vector<Value*> args) {
+Value* subFunction(std::vector<Value*> args, Where where) {
   auto value1 = args.at(0);
   auto value2 = args.at(1);
   if(value1->type == ValueType::V_NUMBER && value2->type == ValueType::V_NUMBER) {
     return new NumberValue(((NumberValue*)value1)->value - ((NumberValue*)value2)->value);
   }
-  std::cerr << "type error at sub: 1st arg is " << valueTypeToString(value1->type) << ", 2nd arg is " << valueTypeToString(value2->type) << std::endl;
+  std::cerr << "type error at sub: 1st arg is " << valueTypeToString(value1->type) << ", 2nd arg is " << valueTypeToString(value2->type) << " at " << where << std::endl;
   return new NullValue();
 }
 
-Value* mulFunction(std::vector<Value*> args) {
+Value* mulFunction(std::vector<Value*> args, Where where) {
   auto value1 = args.at(0);
   auto value2 = args.at(1);
   if(value1->type == ValueType::V_NUMBER && value2->type == ValueType::V_NUMBER) {
     return new NumberValue(((NumberValue*)value1)->value * ((NumberValue*)value2)->value);
   }
-  std::cerr << "type error at mul: 1st arg is " << valueTypeToString(value1->type) << ", 2nd arg is " << valueTypeToString(value2->type) << std::endl;
+  std::cerr << "type error at mul: 1st arg is " << valueTypeToString(value1->type) << ", 2nd arg is " << valueTypeToString(value2->type) << " at " << where << std::endl;
   return new NullValue();
 }
 
-Value* divFunction(std::vector<Value*> args) {
+Value* divFunction(std::vector<Value*> args, Where where) {
   auto value1 = args.at(0);
   auto value2 = args.at(1);
   if(value1->type == ValueType::V_NUMBER && value2->type == ValueType::V_NUMBER) {
+    if(((NumberValue*)value2)->value == 0) {
+      std::cerr << "zero division at " << where << std::endl;
+      return new NullValue();
+    }
     return new NumberValue(((NumberValue*)value1)->value / ((NumberValue*)value2)->value);
   }
-  std::cerr << "type error at div: 1st arg is " << valueTypeToString(value1->type) << ", 2nd arg is " << valueTypeToString(value2->type) << std::endl;
+  std::cerr << "type error at div: 1st arg is " << valueTypeToString(value1->type) << ", 2nd arg is " << valueTypeToString(value2->type) << " at " << where << std::endl;
   return new NullValue();
 }
 
-Value* modFunction(std::vector<Value*> args) {
+Value* modFunction(std::vector<Value*> args, Where where) {
   auto value1 = args.at(0);
   auto value2 = args.at(1);
   if(value1->type == ValueType::V_NUMBER && value2->type == ValueType::V_NUMBER) {
     return new NumberValue(((NumberValue*)value1)->value % ((NumberValue*)value2)->value);
   }
-  std::cerr << "type error at mod: 1st arg is " << valueTypeToString(value1->type) << ", 2nd arg is " << valueTypeToString(value2->type) << std::endl;
+  std::cerr << "type error at mod: 1st arg is " << valueTypeToString(value1->type) << ", 2nd arg is " << valueTypeToString(value2->type) << " at " << where << std::endl;
   return new NullValue();
 }
 
-Value* eqFunction(std::vector<Value*> args) {
+Value* eqFunction(std::vector<Value*> args, Where where) {
   auto value1 = args.at(0);
   auto value2 = args.at(1);
   if(value1->type == ValueType::V_NUMBER && value2->type == ValueType::V_NUMBER) {
@@ -669,50 +722,54 @@ Value* eqFunction(std::vector<Value*> args) {
   return new NumberValue(0);
 }
 
-Value* ltFunction(std::vector<Value*> args) {
+Value* ltFunction(std::vector<Value*> args, Where where) {
   auto value1 = args.at(0);
   auto value2 = args.at(1);
   if(value1->type == ValueType::V_NUMBER && value2->type == ValueType::V_NUMBER) {
     return new NumberValue(((NumberValue*)value1)->value < ((NumberValue*)value2)->value);
   }
-  std::cerr << "type error at lt: 1st arg is " << valueTypeToString(value1->type) << ", 2nd arg is " << valueTypeToString(value2->type) << std::endl;
+  std::cerr << "type error at lt: 1st arg is " << valueTypeToString(value1->type) << ", 2nd arg is " << valueTypeToString(value2->type) << " at " << where << std::endl;
   return new NullValue();
 }
 
-Value* gtFunction(std::vector<Value*> args) {
+Value* gtFunction(std::vector<Value*> args, Where where) {
   auto value1 = args.at(0);
   auto value2 = args.at(1);
   if(value1->type == ValueType::V_NUMBER && value2->type == ValueType::V_NUMBER) {
     return new NumberValue(((NumberValue*)value1)->value > ((NumberValue*)value2)->value);
   }
-  std::cerr << "type error at gt: 1st arg is " << valueTypeToString(value1->type) << ", 2nd arg is " << valueTypeToString(value2->type) << std::endl;
+  std::cerr << "type error at gt: 1st arg is " << valueTypeToString(value1->type) << ", 2nd arg is " << valueTypeToString(value2->type) << " at " << where << std::endl;
   return new NullValue();
 }
 
-Value* toIntFunction(std::vector<Value*> args) {
+Value* toIntFunction(std::vector<Value*> args, Where where) {
   auto value = args.at(0);
   if(value->type == ValueType::V_STRING) {
-    return new NumberValue(std::stoi(((StringValue*)value)->value));
+    try {
+      return new NumberValue(std::stoi(((StringValue*)value)->value));
+    } catch(std::invalid_argument e) {
+      return new NumberValue(0);
+    }
   }
-  std::cerr << "type error at toInt: arg is " << valueTypeToString(value->type) << std::endl;
+  std::cerr << "type error at toInt: arg is " << valueTypeToString(value->type) << " at " << where << std::endl;
   return new NullValue();
 }
 
-Value* toStringFunction(std::vector<Value*> args) {
+Value* toStringFunction(std::vector<Value*> args, Where where) {
   auto value = args.at(0);
   if(value->type == ValueType::V_NUMBER) {
     return new StringValue(std::to_string(((NumberValue*)value)->value));
   }
-  std::cerr << "type error at toString: arg is " << valueTypeToString(value->type) << std::endl;
+  std::cerr << "type error at toString: arg is " << valueTypeToString(value->type) << " at " << where << std::endl;
   return new NullValue();
 }
 
-Value* typeFunction(std::vector<Value*> args) {
+Value* typeFunction(std::vector<Value*> args, Where where) {
   auto value = args.at(0);
   return new StringValue(valueTypeToString(value->type));
 }
 
-Value* readFunction(std::vector<Value*> args) {
+Value* readFunction(std::vector<Value*> args, Where where) {
   std::string value;
   std::getline(std::cin, value);
   return new StringValue(value);
@@ -743,6 +800,9 @@ Environment* defaultEnvironment() {
 void run(std::string input) {
   std::vector<Token*> tokens = tokenize(input);
   AST* ast = parse(tokens);
+  if(ast == nullptr) {
+    return;
+  }
   Environment* env = defaultEnvironment();
   execute(ast, env);
 }

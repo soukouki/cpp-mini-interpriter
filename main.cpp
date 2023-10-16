@@ -1,4 +1,5 @@
 #include<iostream>
+#include<fstream>
 #include<sstream>
 #include<string>
 #include<vector>
@@ -7,17 +8,32 @@
 
 void run(std::string input);
 
-int main() {
-  run(R"(
-    (print (concat "Hello, " "World!"))
-    (print (getAt "Hello, World!" 4))
-    ((fun () (set x 1) (print x)))
-    (set add1 (fun (x) (add x 1)))
-    (if (eq (add1 1) 1) (print "true") (print "false"))
-    (set fact (fun (x) (if (eq x 0) 1 (mul x (fact (sub x 1))))))
-    (set i (toInt (read)))
-    (print (concat "fact = " (toStr (fact i))))
-  )");
+int main(int argc, char** argv) {
+  if(argc == 2) {
+    // execute file
+    std::ifstream ifs(argv[1]);
+    if(ifs.fail()) {
+      std::cerr << "failed to open file: " << argv[1] << std::endl;
+      return 1;
+    }
+    std::string input;
+    std::string line;
+    while(getline(ifs, line)) {
+      input += line + "\n";
+    }
+    run(input);
+  } else {
+    run(R"(
+      (print (concat "Hello, " "World!"))
+      (print (getAt "Hello, World!" 4))
+      ((fun () (set x 1) (print x)))
+      (set add1 (fun (x) (add x 1)))
+      (if (eq (add1 1) 1) (print "true") (print "false"))
+      (set fact (fun (x) (if (eq x 0) 1 (mul x (fact (sub x 1))))))
+      (set i (toInt (read)))
+      (print (concat "fact = " (toStr (fact i))))
+    )");
+  }
 }
 
 class Where {

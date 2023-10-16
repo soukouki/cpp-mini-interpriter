@@ -12,6 +12,34 @@
 (set or (fun (x y) (if x true y)))
 (set xor (fun (x y) (if x (not y) y)))
 
+(set neq (fun (x y) (not (eq x y))))
+
+(set fold (fun (f init l)
+  (if (eq l null) init
+      (f (car l) (fold f init (cdr l))))
+))
+(set sum (fun (l) (fold add 0 l)))
+
+(set map (fun (f l)
+  (if (eq l null) null
+      (cons (f (car l)) (map f (cdr l))))
+))
+
+(set toStr_ toStr)
+(set toStr (fun (x)
+  (set type (type x))
+  (if (eq type "STRING") x
+      (if (eq type "NULL") "null"
+          (if (eq type "DEFINED_FUNCTION") "<function>"
+              (if (eq type "BUILD_IN_FUNCTION") "<build_in>"
+                  (toStr_ x)))))
+))
+
+(set listToStr (fun (l)
+  (if (eq l null) "null"
+      (concat "(" (concat (toStr (car l)) (concat " " (concat (listToStr (cdr l)) ")")))))
+))
+
 (set minus1 (sub 0 1))
 
 # (substr "abcd" 1 3) => "bc"
@@ -32,14 +60,14 @@
   (searchChar_ s c 0)
 ))
 
-(set split2 (fun (s c)
+(set split2 (fun (c s)
   (set i (searchChar s c))
   (if (eq i minus1) (cons s "")
       (cons (substr s 0 i) (substr s (add i 1) (length s))))
 ))
-(set split (fun (s c)
+(set split (fun (c s)
   (set i (searchChar s c))
   (if (eq i minus1) (cons s null)
       (cons (substr s 0 i)
-            (split (substr s (add i 1) (length s)) c)))
+            (split c (substr s (add i 1) (length s)))))
 ))

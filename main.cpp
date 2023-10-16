@@ -789,7 +789,7 @@ Value* toStringFunction(std::vector<Value*> args, Where where) {
   if(value->type == ValueType::V_NUMBER) {
     return new StringValue(std::to_string(((NumberValue*)value)->value));
   }
-  std::cerr << "type error at toString: arg is " << valueTypeToString(value->type) << " at " << where << std::endl;
+  std::cerr << "type error at toStr: arg is " << valueTypeToString(value->type) << " at " << where << std::endl;
   return new NullValue();
 }
 

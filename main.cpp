@@ -58,6 +58,7 @@ enum class TokenType {
     T_STRING,
     T_NUMBER,
     T_SYMBOL,
+    T_EOF,
 };
 
 std::string tokenTypeToString(TokenType type) {
@@ -72,6 +73,8 @@ std::string tokenTypeToString(TokenType type) {
       return "NUMBER";
     case TokenType::T_SYMBOL:
       return "SYMBOL";
+    case TokenType::T_EOF:
+      return "EOF";
   }
   return "UNKNOWN";
 }
@@ -99,6 +102,11 @@ class SymbolToken : public Token {
   public:
   std::string value;
   SymbolToken(std::string value, Where where) : Token(TokenType::T_SYMBOL, where), value(value) {}
+};
+
+class EOFToken : public Token {
+  public:
+  EOFToken(Where where) : Token(TokenType::T_EOF, where) {}
 };
 
 std::vector<Token*> tokenize(std::string input) {
@@ -162,26 +170,29 @@ std::vector<Token*> tokenize(std::string input) {
       std::cerr << "unknown char: " << c << " at " << where << std::endl;
     }
   }
+  tokens.push_back(new EOFToken(Where(line, input.size() - line_start)));
   return tokens;
 }
 
 void printTokens(std::vector<Token*> tokens, int index) {
   for(int i = 0; i < tokens.size(); i++) {
     if(i == index) {
-      std::cout << " >>";
+      std::cout << ">>";
     } else {
-      std::cout << "   ";
+      std::cout << "  ";
     }
     if(tokens.at(i)->type == TokenType::T_LPAREN) {
       std::cout << "(";
     } else if(tokens.at(i)->type == TokenType::T_RPAREN) {
       std::cout << ")";
     } else if(tokens.at(i)->type == TokenType::T_STRING) {
-      std::cout << "<str: " << ((StringToken*)tokens.at(i))->value << ">";
+      std::cout << "<str>";
     } else if(tokens.at(i)->type == TokenType::T_NUMBER) {
-      std::cout << "<num: " << ((NumberToken*)tokens.at(i))->value << ">";
+      std::cout << "<num>";
     } else if(tokens.at(i)->type == TokenType::T_SYMBOL) {
       std::cout << ((SymbolToken*)tokens.at(i))->value;
+    } else if(tokens.at(i)->type == TokenType::T_EOF) {
+      std::cout << "<eof>";
     }
   }
   std::cout << std::endl;
@@ -380,6 +391,7 @@ AST* parseFuncCall(std::vector<Token*> tokens, int& index) {
 
 // (expr ...) or value
 AST* parseExpression(std::vector<Token*> tokens, int& index) {
+  auto expression_token_where = tokens.at(index)->where;
   if(tokens.at(index)->type == TokenType::T_LPAREN) {
     index++;
     AST* ast = parseSet(tokens, index);
@@ -393,13 +405,14 @@ AST* parseExpression(std::vector<Token*> tokens, int& index) {
       ast = parseFuncCall(tokens, index);
     }
     if(ast == nullptr) {
-      std::cerr << "unknown expression at" << tokens.at(index)->where << std::endl;
+      std::cerr << "unknown expression at" << expression_token_where << std::endl;
       return nullptr;
     }
     if(tokens.at(index)->type == TokenType::T_RPAREN) {
       index++;
       return ast;
     }
+    std::cerr << "missing ')' at " << expression_token_where << std::endl;
     return nullptr;
   } else {
     return parseValue(tokens, index);
@@ -422,7 +435,7 @@ AST* parseStatements(std::vector<Token*> tokens, int& index) {
 AST* parse(std::vector<Token*> tokens) {
   int index = 0;
   auto ast = parseStatements(tokens, index);
-  if(index < tokens.size()) {
+  if(tokens.at(index)->type != TokenType::T_EOF) {
     std::cerr << "parse error at " << tokens.at(index)->where << std::endl;
     return nullptr;
   }

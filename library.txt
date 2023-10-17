@@ -24,6 +24,26 @@
   (if (eq l null) null
       (cons (f (car l)) (map f (cdr l))))
 ))
+(set filter (fun (f l)
+  (if (eq l null) null
+      (if (f (car l)) (cons (car l) (filter f (cdr l)))
+          (filter f (cdr l))))
+))
+
+(set insert (fun (l x i)
+  (if (eq i 0) (cons x l)
+      (cons (car l) (insert (cdr l) x (sub i 1))))
+))
+(set remove (fun (l i)
+  (if (eq i 0) (cdr l)
+      (cons (car l) (remove (cdr l) (sub i 1))))
+))
+(set repeat (fun (f n)
+  (set repeat_ (fun (n l)
+    (if (eq n 0) l
+        (cons (f) (repeat_ (sub n 1) l)))))
+  (repeat_ n null)
+))
 
 (set toStr_ toStr)
 (set toStr (fun (x)
@@ -36,7 +56,7 @@
 ))
 
 (set listToStr (fun (l)
-  (if (eq l null) "null"
+  (if (neq (type l) "DEFINED_FUNCTION") (toStr l)
       (concat "(" (concat (toStr (car l)) (concat " " (concat (listToStr (cdr l)) ")")))))
 ))
 

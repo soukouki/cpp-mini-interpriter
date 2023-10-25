@@ -664,12 +664,21 @@ Value* getAtFunction(std::vector<Value*> args, Where where) {
     auto value = ((StringValue*)value1)->value;
     auto index = ((NumberValue*)value2)->value;
     if(index >= 0 && index < value.size()) {
-      return new StringValue(value.substr(index, 1));
+      return new NumberValue(value.at(index));
     } else {
       std::cerr << "index out of range: " << index << " at " << where << std::endl;
     }
   }
   std::cerr << "type error at getAt: 1st arg is " << valueTypeToString(value1->type) << ", 2nd arg is " << valueTypeToString(value2->type) << " at " << where << std::endl;
+  return new NumberValue(0);
+}
+
+Value* charFunction(std::vector<Value*> args, Where where) {
+  auto value = args.at(0);
+  if(value->type == ValueType::V_NUMBER) {
+    return new StringValue(std::string(1, ((NumberValue*)value)->value));
+  }
+  std::cerr << "type error at char: arg is " << valueTypeToString(value->type) << " at " << where << std::endl;
   return new NullValue();
 }
 
@@ -809,6 +818,7 @@ Environment* defaultEnvironment() {
   env->set("print", new BuildInFunctionValue(printFunction, 1));
   env->set("concat", new BuildInFunctionValue(concatFunction, 2));
   env->set("getAt", new BuildInFunctionValue(getAtFunction, 2));
+  env->set("char", new BuildInFunctionValue(charFunction, 1));
   env->set("length", new BuildInFunctionValue(lengthFunction, 1));
   env->set("add", new BuildInFunctionValue(addFunction, 2));
   env->set("sub", new BuildInFunctionValue(subFunction, 2));

@@ -57,7 +57,7 @@
 
 (set listToStr (fun (l)
   (if (neq (type l) "DEFINED_FUNCTION") (toStr l)
-      (concat "(" (concat (toStr (car l)) (concat " " (concat (listToStr (cdr l)) ")")))))
+      (concat "(" (concat (listToStr (car l)) (concat " " (concat (listToStr (cdr l)) ")")))))
 ))
 
 (set minus1 (sub 0 1))

@@ -547,7 +547,7 @@ class FunctionValue : public Value {
   }
   protected:
   virtual Value* call(std::vector<Value*> args, Where where) = 0;
-  FunctionValue(ValueType type, int args_size) : Value(type), args_size(args_size) {}
+  FunctionValue(ValueType type, int args_size, std::vector<Value*> applied_args) : Value(type), args_size(args_size), applied_args(applied_args) {}
 };
 
 Value* execute(AST* ast, Environment* env);
@@ -557,7 +557,7 @@ class DefinedFunctionValue : public FunctionValue {
   std::vector<std::string> arg_names;
   AST* body;
   Environment* env;
-  DefinedFunctionValue(int args_size, std::vector<std::string> arg_names, AST* body, Environment* env) : FunctionValue(ValueType::V_DEFINED_FUNCTION, args_size), arg_names(arg_names), body(body), env(env) {}
+  DefinedFunctionValue(int args_size, std::vector<std::string> arg_names, std::vector<Value*> applied_args, AST* body, Environment* env) : FunctionValue(ValueType::V_DEFINED_FUNCTION, args_size, applied_args), arg_names(arg_names), body(body), env(env) {}
   Value* call(std::vector<Value*> args, Where where) {
     auto new_env = env->createChild();
     for(int i = 0; i < args.size(); i++) {
@@ -566,19 +566,19 @@ class DefinedFunctionValue : public FunctionValue {
     return execute(body, new_env);
   }
   DefinedFunctionValue* copy() {
-    return new DefinedFunctionValue(args_size, arg_names, body, env);
+    return new DefinedFunctionValue(args_size, arg_names, applied_args, body, env);
   }
 };
 
 class BuildInFunctionValue : public FunctionValue {
   public:
   std::function<Value*(std::vector<Value*>, Where)> func;
-  BuildInFunctionValue(std::function<Value*(std::vector<Value*>, Where)> func, int args_size) : FunctionValue(ValueType::V_BUILD_IN_FUNCTION, args_size), func(func) {}
+  BuildInFunctionValue(std::function<Value*(std::vector<Value*>, Where)> func, int args_size, std::vector<Value*> applied_args) : FunctionValue(ValueType::V_BUILD_IN_FUNCTION, args_size, applied_args), func(func) {}
   Value* call(std::vector<Value*> args, Where where) {
     return func(args, where);
   }
   BuildInFunctionValue* copy() {
-    return new BuildInFunctionValue(func, args_size);
+    return new BuildInFunctionValue(func, args_size, applied_args);
   }
 };
 
@@ -612,7 +612,7 @@ Value* execute(AST* ast, Environment* env) {
     }
   } else if(ast->type == ASTType::A_LAMBDA) {
     auto lambda_ast = (LambdaAST*)ast;
-    return new DefinedFunctionValue(lambda_ast->args.size(), lambda_ast->args, lambda_ast->body, env);
+    return new DefinedFunctionValue(lambda_ast->args.size(), lambda_ast->args, {}, lambda_ast->body, env);
   } else if(ast->type == ASTType::A_IF) {
     auto if_ast = (IfAST*)ast;
     Value* cond = execute(if_ast->cond, env);
@@ -815,23 +815,23 @@ Value* readFunction(std::vector<Value*> args, Where where) {
 
 Environment* defaultEnvironment() {
   Environment* env = new Environment();
-  env->set("print", new BuildInFunctionValue(printFunction, 1));
-  env->set("concat", new BuildInFunctionValue(concatFunction, 2));
-  env->set("getAt", new BuildInFunctionValue(getAtFunction, 2));
-  env->set("char", new BuildInFunctionValue(charFunction, 1));
-  env->set("length", new BuildInFunctionValue(lengthFunction, 1));
-  env->set("add", new BuildInFunctionValue(addFunction, 2));
-  env->set("sub", new BuildInFunctionValue(subFunction, 2));
-  env->set("mul", new BuildInFunctionValue(mulFunction, 2));
-  env->set("div", new BuildInFunctionValue(divFunction, 2));
-  env->set("mod", new BuildInFunctionValue(modFunction, 2));
-  env->set("eq", new BuildInFunctionValue(eqFunction, 2));
-  env->set("lt", new BuildInFunctionValue(ltFunction, 2));
-  env->set("gt", new BuildInFunctionValue(gtFunction, 2));
-  env->set("toInt", new BuildInFunctionValue(toIntFunction, 1));
-  env->set("toStr", new BuildInFunctionValue(toStringFunction, 1));
-  env->set("type", new BuildInFunctionValue(typeFunction, 1));
-  env->set("read", new BuildInFunctionValue(readFunction, 0));
+  env->set("print", new BuildInFunctionValue(printFunction, 1, {}));
+  env->set("concat", new BuildInFunctionValue(concatFunction, 2, {}));
+  env->set("getAt", new BuildInFunctionValue(getAtFunction, 2, {}));
+  env->set("char", new BuildInFunctionValue(charFunction, 1, {}));
+  env->set("length", new BuildInFunctionValue(lengthFunction, 1, {}));
+  env->set("add", new BuildInFunctionValue(addFunction, 2, {}));
+  env->set("sub", new BuildInFunctionValue(subFunction, 2, {}));
+  env->set("mul", new BuildInFunctionValue(mulFunction, 2, {}));
+  env->set("div", new BuildInFunctionValue(divFunction, 2, {}));
+  env->set("mod", new BuildInFunctionValue(modFunction, 2, {}));
+  env->set("eq", new BuildInFunctionValue(eqFunction, 2, {}));
+  env->set("lt", new BuildInFunctionValue(ltFunction, 2, {}));
+  env->set("gt", new BuildInFunctionValue(gtFunction, 2, {}));
+  env->set("toInt", new BuildInFunctionValue(toIntFunction, 1, {}));
+  env->set("toStr", new BuildInFunctionValue(toStringFunction, 1, {}));
+  env->set("type", new BuildInFunctionValue(typeFunction, 1, {}));
+  env->set("read", new BuildInFunctionValue(readFunction, 0, {}));
   env->set("null", new NullValue());
   return env;
 }

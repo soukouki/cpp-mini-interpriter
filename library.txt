@@ -63,6 +63,55 @@
       (concat "(" (concat (listToStr (car l)) (concat " " (concat (listToStr (cdr l)) ")")))))
 ))
 
+(set dic null)
+(set listToDic (fun (l)
+  (set dic_ (fun (l d)
+    (if (eq l null) d
+        (dic_ (cdr l) (cons (car l) d)))))
+  (dic_ l null)
+))
+(set dicGet (fun (d k)
+  (set dicGet_ (fun (d k)
+    (if (eq d null) null
+        (if (eq (car (car d)) k) (cdr (car d))
+            (dicGet_ (cdr d) k)))))
+  (dicGet_ d k)
+))
+(set dicSet (fun (d k v)
+  (set dicSet_ (fun (d k v d_)
+    (if (eq d null) (cons (cons k v) d_)
+        (if (eq (car (car d)) k) (cons (cons k v) (cdr d_))
+            (dicSet_ (cdr d) k v (cons (car d) d_))))))
+  (dicSet_ d k v null)
+))
+(set dicDel (fun (d k)
+  (set dicDel_ (fun (d k d_)
+    (if (eq d null) d_
+        (if (eq (car (car d)) k) (cdr d_)
+            (dicDel_ (cdr d) k (cons (car d) d_))))))
+  (dicDel_ d k null)
+))
+(set dicToList (fun (d)
+  (set dicToList_ (fun (d l)
+    (if (eq d null) l
+        (dicToList_ (cdr d) (cons (cons (car (car d)) (cdr (car d))) l)))))
+  (dicToList_ d null)
+))
+(set dicHasKey (fun (d k)
+  (set dicHasKey_ (fun (d k)
+    (if (eq d null) false
+        (if (eq (car (car d)) k) true
+            (dicHasKey_ (cdr d) k)))))
+  (dicHasKey_ d k)
+))
+(set dicToStr (fun (d) (listToStr (dicToList d))))
+(set dicMap (fun (f d)
+  (set dicMap_ (fun (f d d_)
+    (if (eq d null) d_
+        (dicMap_ f (cdr d) (cons (cons (car (car d)) (f (cdr (car d)))) d_)))))
+  (dicMap_ f d null)
+))
+
 (set minus1 (sub 0 1))
 
 # (substr "abcd" 1 3) => "bc"
